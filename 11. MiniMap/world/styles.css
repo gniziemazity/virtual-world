@@ -1,0 +1,38 @@
+body {
+   background-color: black;
+   text-align: center;
+   overflow: hidden;
+}
+
+h1 {
+   color: white;
+   font-family: Arial;
+}
+
+#myCanvas {
+   background-color: #2a5;
+}
+
+button, .file-input-label {
+   display: inline-block;
+   background-color: white;
+   font-size: 20px;
+   padding: 5px 7px 7px 5px;
+   border: none;
+   border-radius: 5px;
+   text-shadow: 1px 1px black;
+   cursor: pointer;
+}
+
+input[type="file"] {
+   display: none;
+}
+
+#osmPanel {
+   position: absolute;
+   top: 50%;
+   left: 50%;
+   transform: translate(-50%,-50%);
+   background-color: rgba(0, 0, 0, 0.7);
+   padding: 5000px;
+}

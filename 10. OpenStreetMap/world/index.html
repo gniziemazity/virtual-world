@@ -1,0 +1,197 @@
+<!DOCTYPE html>
+<html>
+   <head>
+      <title>World Editor</title>
+      <link rel="stylesheet" href="styles.css"/>
+   </head>
+   <body>
+      <h1>World Editor</h1>
+      <canvas id="myCanvas"></canvas>
+      <div id="controls">
+         <button onclick="dispose()">🗑️</button>
+         <button onclick="save()">💾</button>
+         <label for="fileInput" class="file-input-label">
+            📁
+            <input
+               type="file"
+               id="fileInput"
+               accept=".world"
+               onchange="load(event)"
+            />
+         </label>
+         <button onclick="openOsmPanel()">🗺️</button>
+         &nbsp;
+         <button id="graphBtn" onclick="setMode('graph')">🌐</button>
+         <button id="stopBtn" onclick="setMode('stop')">🛑</button>
+         <button id="yieldBtn" onclick="setMode('yield')">⚠️</button>
+         <button id="crossingBtn" onclick="setMode('crossing')">🚶</button>
+         <button id="parkingBtn" onclick="setMode('parking')">🅿️</button>
+         <button id="lightBtn" onclick="setMode('light')">🚦</button>
+         <button id="startBtn" onclick="setMode('start')">🚙</button>
+         <button id="targetBtn" onclick="setMode('target')">🎯</button>
+
+         <div id="osmPanel" style="display:none;">
+            <textarea id="osmDataContainer" rows="10" cols="50" 
+               placeholder="Paste OSM data here"></textarea>
+            <div>
+               <button onclick="parseOsmData()">✔️</button>
+               <button onclick="closeOsmPanel()">❌</button>
+            </div>
+         </div>
+      </div>
+
+      <script src="js/world.js"></script>
+      <script src="js/viewport.js"></script>
+      <script src="js/markings/marking.js"></script>
+      <script src="js/markings/stop.js"></script>
+      <script src="js/markings/start.js"></script>
+      <script src="js/markings/crossing.js"></script>
+      <script src="js/markings/parking.js"></script>
+      <script src="js/markings/light.js"></script>
+      <script src="js/markings/target.js"></script>
+      <script src="js/markings/yield.js"></script>
+      <script src="js/editors/markingEditor.js"></script>
+      <script src="js/editors/graphEditor.js"></script>
+      <script src="js/editors/crossingEditor.js"></script>
+      <script src="js/editors/stopEditor.js"></script>
+      <script src="js/editors/startEditor.js"></script>
+      <script src="js/editors/parkingEditor.js"></script>
+      <script src="js/editors/lightEditor.js"></script>
+      <script src="js/editors/targetEditor.js"></script>
+      <script src="js/editors/yieldEditor.js"></script>
+      <script src="js/items/tree.js"></script>
+      <script src="js/items/building.js"></script>
+      <script src="js/math/utils.js"></script>
+      <script src="js/math/graph.js"></script>
+      <script src="js/math/osm.js"></script>
+      <script src="js/primitives/point.js"></script>
+      <script src="js/primitives/segment.js"></script>
+      <script src="js/primitives/polygon.js"></script>
+      <script src="js/primitives/envelope.js"></script>
+      <script>
+         myCanvas.width = 600;
+         myCanvas.height = 600;
+
+         const ctx = myCanvas.getContext("2d");
+
+         const worldString = localStorage.getItem("world");
+         const worldInfo = worldString ? JSON.parse(worldString) : null;
+         let world = worldInfo
+            ? World.load(worldInfo)
+            : new World(new Graph());
+         const graph = world.graph; 
+
+         const viewport = new Viewport(myCanvas, world.zoom, world.offset);
+
+         const tools = {
+            graph: { button: graphBtn, editor: new GraphEditor(viewport, graph) },
+            stop: { button: stopBtn, editor: new StopEditor(viewport, world) },
+            crossing: { button: crossingBtn, editor: new CrossingEditor(viewport, world) },
+            start: { button: startBtn, editor: new StartEditor(viewport, world) },
+            parking: { button: parkingBtn, editor: new ParkingEditor(viewport, world) },
+            light: { button: lightBtn, editor: new LightEditor(viewport, world) },
+            target: { button: targetBtn, editor: new TargetEditor(viewport, world) },
+            yield: { button: yieldBtn, editor: new YieldEditor(viewport, world) },
+         };
+
+         let oldGraphHash = graph.hash();
+
+         setMode("graph");
+
+         animate();
+
+         function animate() {
+            viewport.reset();
+            if (graph.hash() != oldGraphHash) {
+               world.generate();
+               oldGraphHash = graph.hash();
+            }
+            const viewPoint = scale(viewport.getOffset(), -1);
+            world.draw(ctx, viewPoint);
+            ctx.globalAlpha = 0.3;
+            for (const tool of Object.values(tools)) {
+               tool.editor.display();
+            }
+            requestAnimationFrame(animate);
+         }
+
+         function dispose() {
+            tools["graph"].editor.dispose();
+            world.markings.length = 0;
+         }
+
+         function save() {
+            world.zoom = viewport.zoom;
+            world.offset = viewport.offset;
+
+            const element = document.createElement("a");
+            element.setAttribute(
+               "href",
+               "data:application/json;charset=utf-8," +
+                  encodeURIComponent(JSON.stringify(world))
+            );
+
+            const fileName = "name.world";
+            element.setAttribute("download", fileName);
+
+            element.click();
+
+            localStorage.setItem("world", JSON.stringify(world));
+         }
+
+         function load(event) {
+            const file = event.target.files[0];
+
+            if (!file) {
+               alert("No file selected.");
+               return;
+            }
+
+            const reader = new FileReader();
+            reader.readAsText(file);
+
+            reader.onload = (evt) => {
+               const fileContent = evt.target.result;
+               const jsonData = JSON.parse(fileContent);
+               world = World.load(jsonData);
+               localStorage.setItem("world", JSON.stringify(world));
+               location.reload();
+            }
+         }
+
+         function setMode(mode) {
+            dissableEditors();
+            tools[mode].button.style.backgroundColor = "white";
+            tools[mode].button.style.filter = "";
+            tools[mode].editor.enable();
+         }
+
+         function dissableEditors() {
+            for (const tool of Object.values(tools)) {
+               tool.button.style.backgroundColor = "gray";
+               tool.button.style.filter = "grayscale(100%)";
+               tool.editor.disable();
+            }
+         }
+
+         function openOsmPanel() {
+            osmPanel.style.display = "block";
+         }
+
+         function closeOsmPanel() {
+            osmPanel.style.display = "none";
+         }
+
+         function parseOsmData() {
+            if (osmDataContainer.value == "") {
+               alert("Paste data first");
+               return;
+            }
+            const res = Osm.parseRoads(JSON.parse(osmDataContainer.value));
+            graph.points = res.points;
+            graph.segments = res.segments;
+            closeOsmPanel();
+         }
+      </script>
+   </body>
+</html>
